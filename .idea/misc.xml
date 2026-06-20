@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="GOROOT" url="file://$USER_HOME$/sdk/go1.18.2" />
+  <component name="JsBuildToolPackageJson" sorting="DEFINITION_ORDER" />
+  <component name="KubernetesApiProvider"><![CDATA[{}]]></component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectInspectionProfilesVisibleTreeState">
+    <entry key="Project Default">
+      <profile-state>
+        <expanded-state>
+          <State />
+          <State>
+            <id>Code style issuesGo</id>
+          </State>
+          <State>
+            <id>Declaration redundancyGo</id>
+          </State>
+          <State>
+            <id>Flutter</id>
+          </State>
+          <State>
+            <id>Go</id>
+          </State>
+          <State>
+            <id>PHP</id>
+          </State>
+          <State>
+            <id>Quality toolsPHP</id>
+          </State>
+        </expanded-state>
+        <selected-state>
+          <State>
+            <id>Android</id>
+          </State>
+        </selected-state>
+      </profile-state>
+    </entry>
+  </component>
+  <component name="ProjectRootManager" version="2">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
+</project>
