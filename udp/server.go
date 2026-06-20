@@ -1,11 +1,11 @@
 package udp
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
 
-	"github.com/bytedance/sonic"
 	"main.go/config/app_conf"
 )
 
@@ -82,7 +82,8 @@ func routeLoop() {
 				fmt.Printf("[UDP] %s: %s\n", addrStr, string(data.Message))
 			}
 
-			nd, err := sonic.Get(data.Message, "route")
+			var msg map[string]interface{}
+			err := json.Unmarshal(data.Message, &msg)
 			if err != nil {
 				WriteChannel <- UdpData{
 					Addr:    data.Addr,
@@ -90,8 +91,8 @@ func routeLoop() {
 				}
 				continue
 			}
-			r, err := nd.String()
-			if err != nil {
+			r, ok := msg["route"].(string)
+			if !ok {
 				WriteChannel <- UdpData{
 					Addr:    data.Addr,
 					Message: []byte(`{"route":"error","code":400,"data":null,"msg":"missing route field"}`),
