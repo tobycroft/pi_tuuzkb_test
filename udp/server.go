@@ -78,9 +78,7 @@ func routeLoop() {
 		select {
 		case data := <-ReadChannel:
 			addrStr := data.Addr.String()
-			if app_conf.TestMode {
-				fmt.Printf("[UDP] %s: %s\n", addrStr, string(data.Message))
-			}
+			fmt.Printf("[UDP] %s: %s\n", addrStr, string(data.Message))
 
 			var msg map[string]interface{}
 			err := json.Unmarshal(data.Message, &msg)
