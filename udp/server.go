@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	"main.go/config/app_conf"
+	"pi_tuuzkb_test/config/app_conf"
 )
 
 type UdpData struct {

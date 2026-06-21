@@ -1,11 +1,12 @@
 package main
 
 import (
-	"main.go/config/app_conf"
-	"main.go/udp"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"pi_tuuzkb_test/config/app_conf"
+	"pi_tuuzkb_test/udp"
 )
 
 func init() {
@@ -13,7 +14,7 @@ func init() {
 		s, err := os.Stat("./log/")
 		if err != nil {
 			os.Mkdir("./log", 0755)
-		} else if s.IsDir() {
+		} else if !s.IsDir() {
 			os.Mkdir("./log", 0755)
 		}
 	}
