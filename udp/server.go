@@ -63,79 +63,73 @@ func readLoop() {
 }
 
 func writeLoop() {
-	for {
-		select {
-		case data := <-WriteChannel:
-			_, err := ServerConn.WriteToUDP(data.Message, data.Addr)
-			if err != nil {
-				fmt.Println("WriteToUDP error:", err)
-			}
+	for data := range WriteChannel {
+		_, err := ServerConn.WriteToUDP(data.Message, data.Addr)
+		if err != nil {
+			fmt.Println("WriteToUDP error:", err)
 		}
 	}
 }
 
 func routeLoop() {
-	for {
-		select {
-		case data := <-ReadChannel:
-			addrStr := data.Addr.String()
-			fmt.Printf("[UDP] %s: %s\n", addrStr, hex.EncodeToString(data.Message))
+	for data := range ReadChannel {
+		addrStr := data.Addr.String()
+		fmt.Printf("[UDP] %s: %s\n", addrStr, hex.EncodeToString(data.Message))
 
-			// 检查是否为二进制帧（以 0x57 0xAB 开头）
-			if len(data.Message) >= 2 && data.Message[0] == 0x57 && data.Message[1] == 0xAB {
-				// 二进制协议帧：0x81 设备状态 / 0x71 HID 事件
-				ParseBinaryFrame(data.Message)
-				continue
-			}
+		// 检查是否为二进制帧（以 0x57 0xAB 开头）
+		if len(data.Message) >= 2 && data.Message[0] == 0x57 && data.Message[1] == 0xAB {
+			// 二进制协议帧：0x81 设备状态 / 0x71 HID 事件
+			ParseBinaryFrame(data.Message)
+			continue
+		}
 
-			// JSON 协议处理
-			var msg map[string]interface{}
-			err := json.Unmarshal(data.Message, &msg)
-			if err != nil {
-				WriteChannel <- UdpData{
-					Addr:    data.Addr,
-					Message: []byte(`{"route":"error","code":400,"data":null,"msg":"invalid json format"}`),
-				}
-				continue
+		// JSON 协议处理
+		var msg map[string]interface{}
+		err := json.Unmarshal(data.Message, &msg)
+		if err != nil {
+			WriteChannel <- UdpData{
+				Addr:    data.Addr,
+				Message: []byte(`{"route":"error","code":400,"data":null,"msg":"invalid json format"}`),
 			}
-			r, ok := msg["route"].(string)
-			if !ok {
-				WriteChannel <- UdpData{
-					Addr:    data.Addr,
-					Message: []byte(`{"route":"error","code":400,"data":null,"msg":"missing route field"}`),
-				}
-				continue
+			continue
+		}
+		r, ok := msg["route"].(string)
+		if !ok {
+			WriteChannel <- UdpData{
+				Addr:    data.Addr,
+				Message: []byte(`{"route":"error","code":400,"data":null,"msg":"missing route field"}`),
 			}
+			continue
+		}
 
-			switch r {
-			case "ping":
-				AddrMap.Store(addrStr, data.Addr)
-				WriteChannel <- UdpData{
-					Addr:    data.Addr,
-					Message: []byte(`{"route":"pong","code":0,"data":null,"msg":"pong"}`),
-				}
-			case "echo":
-				WriteChannel <- UdpData{
-					Addr:    data.Addr,
-					Message: data.Message,
-				}
-			case "broadcast":
-				msgData := data.Message
-				AddrMap.Range(func(key, value interface{}) bool {
-					addr, ok := value.(*net.UDPAddr)
-					if ok {
-						WriteChannel <- UdpData{
-							Addr:    addr,
-							Message: msgData,
-						}
+		switch r {
+		case "ping":
+			AddrMap.Store(addrStr, data.Addr)
+			WriteChannel <- UdpData{
+				Addr:    data.Addr,
+				Message: []byte(`{"route":"pong","code":0,"data":null,"msg":"pong"}`),
+			}
+		case "echo":
+			WriteChannel <- UdpData{
+				Addr:    data.Addr,
+				Message: data.Message,
+			}
+		case "broadcast":
+			msgData := data.Message
+			AddrMap.Range(func(key, value interface{}) bool {
+				addr, ok := value.(*net.UDPAddr)
+				if ok {
+					WriteChannel <- UdpData{
+						Addr:    addr,
+						Message: msgData,
 					}
-					return true
-				})
-			default:
-				WriteChannel <- UdpData{
-					Addr:    data.Addr,
-					Message: []byte(`{"route":"error","code":404,"data":null,"msg":"route not found"}`),
 				}
+				return true
+			})
+		default:
+			WriteChannel <- UdpData{
+				Addr:    data.Addr,
+				Message: []byte(`{"route":"error","code":404,"data":null,"msg":"route not found"}`),
 			}
 		}
 	}
