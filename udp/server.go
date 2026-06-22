@@ -81,6 +81,14 @@ func routeLoop() {
 			addrStr := data.Addr.String()
 			fmt.Printf("[UDP] %s: %s\n", addrStr, hex.EncodeToString(data.Message))
 
+			// 检查是否为二进制帧（以 0x57 0xAB 开头）
+			if len(data.Message) >= 2 && data.Message[0] == 0x57 && data.Message[1] == 0xAB {
+				// 二进制协议帧：0x81 设备状态 / 0x71 HID 事件
+				ParseBinaryFrame(data.Message)
+				continue
+			}
+
+			// JSON 协议处理
 			var msg map[string]interface{}
 			err := json.Unmarshal(data.Message, &msg)
 			if err != nil {
@@ -112,13 +120,13 @@ func routeLoop() {
 					Message: data.Message,
 				}
 			case "broadcast":
-				msg := data.Message
+				msgData := data.Message
 				AddrMap.Range(func(key, value interface{}) bool {
 					addr, ok := value.(*net.UDPAddr)
 					if ok {
 						WriteChannel <- UdpData{
 							Addr:    addr,
-							Message: msg,
+							Message: msgData,
 						}
 					}
 					return true
