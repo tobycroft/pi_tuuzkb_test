@@ -389,9 +389,20 @@ func parseBinaryEncoderFrame(data []byte) {
 		} else {
 			fmt.Printf("[UDP] Keyboard frame too short: %s\n", hex.EncodeToString(data))
 		}
+	case 0x02:
+		// 0x02 PING frame
+		// 帧格式：[0x57][0xAB][0x06][0x02][payload][checksum]
+		if len(data) >= int(length) {
+			payload := data[4]
+			fmt.Printf("[PING] PING frame, payload=0x%02X\n", payload)
+		}
 	case 0x03:
-		// 0x03 PING/PONG
-		fmt.Printf("[PING] PING/PONG frame\n")
+		// 0x03 PONG frame
+		// 帧格式：[0x57][0xAB][0x06][0x03][payload][checksum]
+		if len(data) >= int(length) {
+			payload := data[4]
+			fmt.Printf("[PING] PONG frame, payload=0x%02X\n", payload)
+		}
 	case 0x04:
 		// 0x04 Device mount
 		if len(data) >= int(length) {
