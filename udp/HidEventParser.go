@@ -99,14 +99,217 @@ func crc8(data []byte) uint8 {
 
 // HandleHidEvent 处理解析后的 HID 事件
 func HandleHidEvent(event *HidEvent) {
-	// 打印调试日志
 	action := "released"
 	if event.Pressed {
 		action = "pressed"
 	}
 
-	fmt.Printf("[HID] seq=%3d type=0x%02X usage=0x%02X %s modifier=0x%02X\n",
-		event.Seq, event.Type, event.Usage, action, event.Modifier)
+	keyName := GetKeyName(event.Usage)
+	modifierText := formatModifiers(event.Modifier)
+
+	fmt.Printf("[HID] seq=%3d type=0x%02X usage=0x%02X (%s) %s modifier=0x%02X (%s)\n",
+		event.Seq, event.Type, event.Usage, keyName, action, event.Modifier, modifierText)
+}
+
+// GetKeyName 将 HID usage code 转换为按键名称
+// 参考：USB HID Usage Tables - Keyboard/Keypad Page (0x07)
+func GetKeyName(usage uint8) string {
+	switch usage {
+	case 0x00:
+		return "NO_KEY"
+	case 0x04:
+		return "A"
+	case 0x05:
+		return "B"
+	case 0x06:
+		return "C"
+	case 0x07:
+		return "D"
+	case 0x08:
+		return "E"
+	case 0x09:
+		return "F"
+	case 0x0A:
+		return "G"
+	case 0x0B:
+		return "H"
+	case 0x0C:
+		return "I"
+	case 0x0D:
+		return "J"
+	case 0x0E:
+		return "K"
+	case 0x0F:
+		return "L"
+	case 0x10:
+		return "M"
+	case 0x11:
+		return "N"
+	case 0x12:
+		return "O"
+	case 0x13:
+		return "P"
+	case 0x14:
+		return "Q"
+	case 0x15:
+		return "R"
+	case 0x16:
+		return "S"
+	case 0x17:
+		return "T"
+	case 0x18:
+		return "U"
+	case 0x19:
+		return "V"
+	case 0x1A:
+		return "W"
+	case 0x1B:
+		return "X"
+	case 0x1C:
+		return "Y"
+	case 0x1D:
+		return "Z"
+	case 0x1E:
+		return "1"
+	case 0x1F:
+		return "2"
+	case 0x20:
+		return "3"
+	case 0x21:
+		return "4"
+	case 0x22:
+		return "5"
+	case 0x23:
+		return "6"
+	case 0x24:
+		return "7"
+	case 0x25:
+		return "8"
+	case 0x26:
+		return "9"
+	case 0x27:
+		return "0"
+	case 0x28:
+		return "ENTER"
+	case 0x29:
+		return "ESC"
+	case 0x2A:
+		return "BACKSPACE"
+	case 0x2B:
+		return "TAB"
+	case 0x2C:
+		return "SPACE"
+	case 0x2D:
+		return "MINUS"
+	case 0x2E:
+		return "EQUAL"
+	case 0x2F:
+		return "LBRACKET"
+	case 0x30:
+		return "RBRACKET"
+	case 0x31:
+		return "BACKSLASH"
+	case 0x33:
+		return "SEMICOLON"
+	case 0x34:
+		return "APOSTROPHE"
+	case 0x35:
+		return "GRAVE"
+	case 0x36:
+		return "COMMA"
+	case 0x37:
+		return "PERIOD"
+	case 0x38:
+		return "SLASH"
+	case 0x39:
+		return "CAPS_LOCK"
+	case 0x3A:
+		return "F1"
+	case 0x3B:
+		return "F2"
+	case 0x3C:
+		return "F3"
+	case 0x3D:
+		return "F4"
+	case 0x3E:
+		return "F5"
+	case 0x3F:
+		return "F6"
+	case 0x40:
+		return "F7"
+	case 0x41:
+		return "F8"
+	case 0x42:
+		return "F9"
+	case 0x43:
+		return "F10"
+	case 0x44:
+		return "F11"
+	case 0x45:
+		return "F12"
+	case 0x46:
+		return "PRINT_SCREEN"
+	case 0x47:
+		return "SCROLL_LOCK"
+	case 0x48:
+		return "PAUSE"
+	case 0x49:
+		return "INSERT"
+	case 0x4A:
+		return "HOME"
+	case 0x4B:
+		return "PAGE_UP"
+	case 0x4C:
+		return "DELETE"
+	case 0x4D:
+		return "END"
+	case 0x4E:
+		return "PAGE_DOWN"
+	case 0x4F:
+		return "RIGHT_ARROW"
+	case 0x50:
+		return "LEFT_ARROW"
+	case 0x51:
+		return "DOWN_ARROW"
+	case 0x52:
+		return "UP_ARROW"
+	case 0x53:
+		return "NUM_LOCK"
+	case 0x54:
+		return "KP_SLASH"
+	case 0x55:
+		return "KP_ASTERISK"
+	case 0x56:
+		return "KP_MINUS"
+	case 0x57:
+		return "KP_PLUS"
+	case 0x58:
+		return "KP_ENTER"
+	case 0x59:
+		return "KP_1"
+	case 0x5A:
+		return "KP_2"
+	case 0x5B:
+		return "KP_3"
+	case 0x5C:
+		return "KP_4"
+	case 0x5D:
+		return "KP_5"
+	case 0x5E:
+		return "KP_6"
+	case 0x5F:
+		return "KP_7"
+	case 0x60:
+		return "KP_8"
+	case 0x61:
+		return "KP_9"
+	case 0x62:
+		return "KP_0"
+	case 0x63:
+		return "KP_PERIOD"
+	default:
+		return fmt.Sprintf("UNKNOWN(0x%02X)", usage)
+	}
 }
 
 // HandleRawHidFrame 处理原始 0x71 帧（从 MessageRouter 调用）
@@ -167,8 +370,9 @@ func parseBinaryEncoderFrame(data []byte) {
 			if pressed {
 				action = "PRESSED "
 			}
-			fmt.Printf("[KEY] usage=0x%02X %s modifiers=0x%02X (%s)\n", 
-				usage, action, modifiers, formatModifiers(modifiers))
+			keyName := GetKeyName(usage)
+			fmt.Printf("[KEY] usage=0x%02X (%s) %s modifiers=0x%02X (%s)\n", 
+				usage, keyName, action, modifiers, formatModifiers(modifiers))
 		} else {
 			fmt.Printf("[UDP] Keyboard frame too short: %s\n", hex.EncodeToString(data))
 		}
