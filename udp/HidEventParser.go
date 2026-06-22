@@ -325,31 +325,44 @@ func HandleRawHidFrame(data []byte) {
 }
 
 // ParseBinaryFrame 解析二进制帧（包含 0x57 0xAB 头部）
-// 根据第三个字节区分不同的帧格式
+// 支持从一个 UDP 包中提取多个帧
 func ParseBinaryFrame(data []byte) {
-	if len(data) < 3 {
-		fmt.Printf("[UDP] Frame too short: %s\n", hex.EncodeToString(data))
-		return
-	}
-
-	if data[0] != 0x57 || data[1] != 0xAB {
-		fmt.Printf("[UDP] Invalid frame header: 0x%02X%02X (expected 0x57AB)\n", data[0], data[1])
-		return
-	}
-
-	switch data[2] {
-	case 0x71:
-		// HID 编码器帧：[0x57][0xAB][0x71][SEQ][TYPE][USAGE][PRESSED][MODIFIER][CRC8]
-		HandleRawHidFrame(data[2:])
-	case 0x81:
-		fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data))
-	default:
-		// 二进制编码器帧：[0x57][0xAB][LEN][TYPE][DATA...]
-		if len(data) < 4 {
-			fmt.Printf("[UDP] Frame too short for TYPE: %s\n", hex.EncodeToString(data))
-			return
+	for len(data) >= 3 {
+		if data[0] != 0x57 || data[1] != 0xAB {
+			fmt.Printf("[UDP] Invalid frame header: 0x%02X%02X (expected 0x57AB)\n", data[0], data[1])
+			break
 		}
-		parseBinaryEncoderFrame(data)
+
+		switch data[2] {
+		case 0x71:
+			if len(data) >= 9 {
+				HandleRawHidFrame(data[2:9])
+				data = data[9:]
+			} else {
+				fmt.Printf("[UDP] HID frame too short: %s\n", hex.EncodeToString(data))
+				break
+			}
+		case 0x81:
+			if len(data) >= 6 {
+				fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data[:6]))
+				data = data[6:]
+			} else {
+				fmt.Printf("[UDP] 0x81 frame too short: %s\n", hex.EncodeToString(data))
+				break
+			}
+		default:
+			if len(data) < 4 {
+				fmt.Printf("[UDP] Frame too short for TYPE: %s\n", hex.EncodeToString(data))
+				break
+			}
+			length := int(data[2])
+			if len(data) < length {
+				fmt.Printf("[UDP] Frame truncated: expected %d bytes, got %d: %s\n", length, len(data), hex.EncodeToString(data))
+				break
+			}
+			parseBinaryEncoderFrame(data[:length])
+			data = data[length:]
+		}
 	}
 }
 
