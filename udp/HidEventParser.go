@@ -3,6 +3,7 @@ package udp
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 )
 
 // HidEvent 表示一个 HID 输入事件（从 0x71 帧解析）
@@ -121,7 +122,7 @@ func HandleRawHidFrame(data []byte) {
 }
 
 // ParseBinaryFrame 解析二进制帧（包含 0x57 0xAB 头部）
-// 根据第三个字节区分协议类型
+// 根据第四个字节（TYPE）区分协议类型
 func ParseBinaryFrame(data []byte) {
 	if len(data) < 3 {
 		fmt.Printf("[UDP] Frame too short: %s\n", hex.EncodeToString(data))
@@ -134,15 +135,107 @@ func ParseBinaryFrame(data []byte) {
 		return
 	}
 
-	// 根据第三个字节区分协议类型
-	switch data[2] {
+	// 根据第四个字节（TYPE）区分协议类型
+	if len(data) < 4 {
+		fmt.Printf("[UDP] Frame too short for TYPE: %s\n", hex.EncodeToString(data))
+		return
+	}
+
+	switch data[3] {
+	case 0x01:
+		// 0x01 Keyboard event frame
+		// 帧格式：[0x57][0xAB][0x08][0x01][usage][pressed][modifiers][checksum]
+		if len(data) >= 8 {
+			usage := data[4]
+			pressed := data[5] == 0x01
+			modifiers := data[6]
+			action := "RELEASED"
+			if pressed {
+				action = "PRESSED "
+			}
+			fmt.Printf("[KEY] usage=0x%02X %s modifiers=0x%02X (%s)\n", 
+				usage, action, modifiers, formatModifiers(modifiers))
+		} else {
+			fmt.Printf("[UDP] Keyboard frame too short: %s\n", hex.EncodeToString(data))
+		}
+	case 0x04:
+		// 0x04 Device mount
+		if len(data) >= 6 {
+			devAddr := data[4]
+			fmt.Printf("[USB] Device mounted: dev_addr=%d\n", devAddr)
+		}
+	case 0x05:
+		// 0x05 Device unmount
+		if len(data) >= 6 {
+			devAddr := data[4]
+			fmt.Printf("[USB] Device unmounted: dev_addr=%d\n", devAddr)
+		}
+	case 0x06:
+		// 0x06 Device info
+		// 帧格式：[0x57][0xAB][0x0B][0x06][dev_addr][vid_low][vid_high][pid_low][pid_high][bInterval][itf_num][itf_protocol][instance][checksum]
+		if len(data) >= 14 {
+			devAddr := data[4]
+			vid := uint16(data[5]) | uint16(data[6])<<8
+			pid := uint16(data[7]) | uint16(data[8])<<8
+			bInterval := data[9]
+			itfNum := data[10]
+			itfProtocol := data[11]
+			instance := data[12]
+			
+			protocolName := "Unknown"
+			switch itfProtocol {
+			case 0x00:
+				protocolName = "None"
+			case 0x01:
+				protocolName = "Keyboard"
+			case 0x02:
+				protocolName = "Mouse"
+			}
+			
+			fmt.Printf("[USB] Device info: dev_addr=%d VID=0x%04X PID=0x%04X bInterval=%dms itf=%d protocol=%s instance=%d\n",
+				devAddr, vid, pid, bInterval, itfNum, protocolName, instance)
+		} else {
+			fmt.Printf("[UDP] Device info frame too short: %s\n", hex.EncodeToString(data))
+		}
 	case 0x81:
 		fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data))
 	case 0x71:
-		// 0x71 HID 输入事件帧
-		// 帧格式：[0x57][0xAB][0x71][SEQ][TYPE][USAGE][PRESSED][MODIFIER][CRC8]
+		// 0x71 HID 输入事件帧（旧协议，用于兼容）
 		HandleRawHidFrame(data[2:])
 	default:
-		fmt.Printf("[UDP] Unknown frame type 0x%02X: %s\n", data[2], hex.EncodeToString(data))
+		fmt.Printf("[UDP] Unknown frame type 0x%02X: %s\n", data[3], hex.EncodeToString(data))
 	}
+}
+
+// formatModifiers 将修饰键位图格式化为可读字符串
+func formatModifiers(modifiers uint8) string {
+	var result []string
+	if modifiers&0x01 != 0 {
+		result = append(result, "L_CTRL")
+	}
+	if modifiers&0x02 != 0 {
+		result = append(result, "L_SHIFT")
+	}
+	if modifiers&0x04 != 0 {
+		result = append(result, "L_ALT")
+	}
+	if modifiers&0x08 != 0 {
+		result = append(result, "L_GUI")
+	}
+	if modifiers&0x10 != 0 {
+		result = append(result, "R_CTRL")
+	}
+	if modifiers&0x20 != 0 {
+		result = append(result, "R_SHIFT")
+	}
+	if modifiers&0x40 != 0 {
+		result = append(result, "R_ALT")
+	}
+	if modifiers&0x80 != 0 {
+		result = append(result, "R_GUI")
+	}
+	if len(result) == 0 {
+		return "none"
+	}
+	return strings.Join(result, "|")
 }
