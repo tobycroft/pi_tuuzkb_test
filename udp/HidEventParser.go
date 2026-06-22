@@ -122,30 +122,44 @@ func HandleRawHidFrame(data []byte) {
 }
 
 // ParseBinaryFrame 解析二进制帧（包含 0x57 0xAB 头部）
-// 根据第四个字节（TYPE）区分协议类型
+// 根据第三个字节区分不同的帧格式
 func ParseBinaryFrame(data []byte) {
 	if len(data) < 3 {
 		fmt.Printf("[UDP] Frame too short: %s\n", hex.EncodeToString(data))
 		return
 	}
 
-	// 检查帧头
 	if data[0] != 0x57 || data[1] != 0xAB {
 		fmt.Printf("[UDP] Invalid frame header: 0x%02X%02X (expected 0x57AB)\n", data[0], data[1])
 		return
 	}
 
-	// 根据第四个字节（TYPE）区分协议类型
-	if len(data) < 4 {
-		fmt.Printf("[UDP] Frame too short for TYPE: %s\n", hex.EncodeToString(data))
-		return
+	switch data[2] {
+	case 0x71:
+		// HID 编码器帧：[0x57][0xAB][0x71][SEQ][TYPE][USAGE][PRESSED][MODIFIER][CRC8]
+		HandleRawHidFrame(data[2:])
+	case 0x81:
+		fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data))
+	default:
+		// 二进制编码器帧：[0x57][0xAB][LEN][TYPE][DATA...]
+		if len(data) < 4 {
+			fmt.Printf("[UDP] Frame too short for TYPE: %s\n", hex.EncodeToString(data))
+			return
+		}
+		parseBinaryEncoderFrame(data)
 	}
+}
 
-	switch data[3] {
+// parseBinaryEncoderFrame 解析二进制编码器帧（LEN+TYPE 格式）
+func parseBinaryEncoderFrame(data []byte) {
+	length := data[2]
+	frameType := data[3]
+
+	switch frameType {
 	case 0x01:
 		// 0x01 Keyboard event frame
 		// 帧格式：[0x57][0xAB][0x08][0x01][usage][pressed][modifiers][checksum]
-		if len(data) >= 8 {
+		if len(data) >= int(length) {
 			usage := data[4]
 			pressed := data[5] == 0x01
 			modifiers := data[6]
@@ -158,22 +172,25 @@ func ParseBinaryFrame(data []byte) {
 		} else {
 			fmt.Printf("[UDP] Keyboard frame too short: %s\n", hex.EncodeToString(data))
 		}
+	case 0x03:
+		// 0x03 PING/PONG
+		fmt.Printf("[PING] PING/PONG frame\n")
 	case 0x04:
 		// 0x04 Device mount
-		if len(data) >= 6 {
+		if len(data) >= int(length) {
 			devAddr := data[4]
 			fmt.Printf("[USB] Device mounted: dev_addr=%d\n", devAddr)
 		}
 	case 0x05:
 		// 0x05 Device unmount
-		if len(data) >= 6 {
+		if len(data) >= int(length) {
 			devAddr := data[4]
 			fmt.Printf("[USB] Device unmounted: dev_addr=%d\n", devAddr)
 		}
 	case 0x06:
 		// 0x06 Device info
 		// 帧格式：[0x57][0xAB][0x0B][0x06][dev_addr][vid_low][vid_high][pid_low][pid_high][bInterval][itf_num][itf_protocol][instance][checksum]
-		if len(data) >= 14 {
+		if len(data) >= int(length) {
 			devAddr := data[4]
 			vid := uint16(data[5]) | uint16(data[6])<<8
 			pid := uint16(data[7]) | uint16(data[8])<<8
@@ -197,13 +214,8 @@ func ParseBinaryFrame(data []byte) {
 		} else {
 			fmt.Printf("[UDP] Device info frame too short: %s\n", hex.EncodeToString(data))
 		}
-	case 0x81:
-		fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data))
-	case 0x71:
-		// 0x71 HID 输入事件帧（旧协议，用于兼容）
-		HandleRawHidFrame(data[2:])
 	default:
-		fmt.Printf("[UDP] Unknown frame type 0x%02X: %s\n", data[3], hex.EncodeToString(data))
+		fmt.Printf("[UDP] Unknown binary frame type 0x%02X: %s\n", frameType, hex.EncodeToString(data))
 	}
 }
 
