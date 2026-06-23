@@ -334,15 +334,47 @@ func ParseBinaryFrame(data []byte) {
 		}
 
 		switch data[2] {
-		case 0x71:
-			if len(data) >= 9 {
-				HandleRawHidFrame(data[2:9])
-				data = data[9:]
-			} else {
-				fmt.Printf("[UDP] HID frame too short: %s\n", hex.EncodeToString(data))
-				break
+	case 0x71:
+		if len(data) >= 9 {
+			HandleRawHidFrame(data[2:9])
+			data = data[9:]
+		} else {
+			fmt.Printf("[UDP] HID frame too short: %s\n", hex.EncodeToString(data))
+			break
+		}
+	case 0x77:
+		// 0x77 自定义键盘事件帧（Pico USB Host → UART 桥接）
+		// 帧格式：[0x57][0xAB][0x77][usage][pressed][modifiers][checksum]（7字节）
+		if len(data) >= 7 {
+			usage := data[3]
+			pressed := data[4] == 0x01
+			modifiers := data[5]
+			
+			// XOR 校验
+			xorSum := byte(0)
+			for i := 0; i < 6; i++ {
+				xorSum ^= data[i]
 			}
-		case 0x81:
+			if xorSum != data[6] {
+				fmt.Printf("[UDP] 0x77 checksum failed: calc=0x%02X recv=0x%02X raw=%s\n",
+					xorSum, data[6], hex.EncodeToString(data[:7]))
+				data = data[7:]
+				continue
+			}
+			
+			action := "RELEASED"
+			if pressed {
+				action = "PRESSED "
+			}
+			keyName := GetKeyName(usage)
+			fmt.Printf("[KEY] usage=0x%02X (%s) %s modifiers=0x%02X (%s)\n",
+				usage, keyName, action, modifiers, formatModifiers(modifiers))
+			data = data[7:]
+		} else {
+			fmt.Printf("[UDP] 0x77 frame too short: %s\n", hex.EncodeToString(data))
+			break
+		}
+	case 0x81:
 			if len(data) >= 6 {
 				fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data[:6]))
 				data = data[6:]
