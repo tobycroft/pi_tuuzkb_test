@@ -351,11 +351,71 @@ func ParseBinaryFrame(data []byte) {
 
 		switch data[2] {
 	case 0x71:
-		if len(data) >= 9 {
-			HandleRawHidFrame(data[2:9])
-			data = data[9:]
+		// 0x71 设备事件帧（Pico USB Host → UART 桥接）
+		// 帧格式：[0x57][0xAB][0x71][dev_addr][mounted][vid_h][vid_l][pid_h][pid_l]
+		//        [bcd_usb_h][bcd_usb_l][b_device_class][b_device_subclass][b_device_protocol][b_max_packet_size0]
+		//        [bcd_device_h][bcd_device_l]
+		//        [b_num_interfaces][b_configuration_value][bm_attributes][b_max_power]
+		//        [itf_num][b_interface_class][b_interface_subclass][itf_protocol][b_interval][instance]
+		//        [checksum]（28字节）
+		if len(data) >= 28 {
+			devAddr := data[3]
+			mounted := data[4] == 0x01
+			vid := uint16(data[5])<<8 | uint16(data[6])
+			pid := uint16(data[7])<<8 | uint16(data[8])
+			bcdUSB := uint16(data[9])<<8 | uint16(data[10])
+			bDeviceClass := data[11]
+			bDeviceSubclass := data[12]
+			bDeviceProtocol := data[13]
+			bMaxPacketSize0 := data[14]
+			bcdDevice := uint16(data[15])<<8 | uint16(data[16])
+			bNumInterfaces := data[17]
+			bConfigurationValue := data[18]
+			bmAttributes := data[19]
+			bMaxPower := data[20]
+			itfNum := data[21]
+			bInterfaceClass := data[22]
+			bInterfaceSubclass := data[23]
+			itfProtocol := data[24]
+			bInterval := data[25]
+			instance := data[26]
+			
+			// XOR 校验
+			xorSum := byte(0)
+			for i := 0; i < 27; i++ {
+				xorSum ^= data[i]
+			}
+			if xorSum != data[27] {
+				fmt.Printf("[UDP] 0x71 checksum failed: calc=0x%02X recv=0x%02X raw=%s\n",
+					xorSum, data[27], hex.EncodeToString(data[:28]))
+				data = data[28:]
+				continue
+			}
+			
+			status := "UNMOUNTED"
+			if mounted {
+				status = "MOUNTED  "
+			}
+			
+			// 设备类型判断
+			deviceType := "UNKNOWN"
+			if itfProtocol == 1 {
+				deviceType = "KEYBOARD"
+			} else if itfProtocol == 2 {
+				deviceType = "MOUSE"
+			}
+			
+			fmt.Printf("[DEV] %s addr=%d VID=0x%04X PID=0x%04X type=%s\n",
+				status, devAddr, vid, pid, deviceType)
+			fmt.Printf("      USB=%04X class=%02X/%02X/%02X maxpkt0=%d version=%04X\n",
+				bcdUSB, bDeviceClass, bDeviceSubclass, bDeviceProtocol, bMaxPacketSize0, bcdDevice)
+			fmt.Printf("      config: numItf=%d cfgVal=%d attr=%02X power=%dmA\n",
+				bNumInterfaces, bConfigurationValue, bmAttributes, bMaxPower*2)
+			fmt.Printf("      interface: num=%d class=%02X subclass=%02X protocol=%d interval=%dms instance=%d\n",
+				itfNum, bInterfaceClass, bInterfaceSubclass, itfProtocol, bInterval, instance)
+			data = data[28:]
 		} else {
-			fmt.Printf("[UDP] HID frame too short: %s\n", hex.EncodeToString(data))
+			fmt.Printf("[UDP] 0x71 frame too short: %s\n", hex.EncodeToString(data))
 			break
 		}
 	case 0x77:
@@ -390,15 +450,7 @@ func ParseBinaryFrame(data []byte) {
 			fmt.Printf("[UDP] 0x77 frame too short: %s\n", hex.EncodeToString(data))
 			break
 		}
-	case 0x81:
-			if len(data) >= 6 {
-				fmt.Printf("[UDP] 0x81 Device state frame: %s\n", hex.EncodeToString(data[:6]))
-				data = data[6:]
-			} else {
-				fmt.Printf("[UDP] 0x81 frame too short: %s\n", hex.EncodeToString(data))
-				break
-			}
-		default:
+	default:
 			if len(data) < 4 {
 				fmt.Printf("[UDP] Frame too short for TYPE: %s\n", hex.EncodeToString(data))
 				break
