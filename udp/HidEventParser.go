@@ -307,6 +307,22 @@ func GetKeyName(usage uint8) string {
 		return "KP_0"
 	case 0x63:
 		return "KP_PERIOD"
+	case 0xE0:
+		return "L_CTRL_EXT"
+	case 0xE1:
+		return "L_SHIFT_EXT"
+	case 0xE2:
+		return "L_ALT_EXT"
+	case 0xE3:
+		return "L_GUI_EXT"
+	case 0xE4:
+		return "R_CTRL_EXT"
+	case 0xE5:
+		return "R_SHIFT_EXT"
+	case 0xE6:
+		return "R_ALT_EXT"
+	case 0xE7:
+		return "R_GUI_EXT"
 	default:
 		return fmt.Sprintf("UNKNOWN(0x%02X)", usage)
 	}
