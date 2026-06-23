@@ -357,9 +357,8 @@ func ParseBinaryFrame(data []byte) {
 		//        [bcd_device_h][bcd_device_l]
 		//        [b_num_interfaces][b_configuration_value][bm_attributes][b_max_power]
 		//        [itf_num][b_interface_class][b_interface_subclass][itf_protocol][b_interval][instance]
-		//        [mfg_len][mfg_data(16)][prod_len][prod_data(16)][serial_len][serial_data(16)]
-		//        [checksum]（79字节）
-		if len(data) >= 79 {
+		//        [checksum]（28字节）
+		if len(data) >= 28 {
 			devAddr := data[3]
 			mounted := data[4] == 0x01
 			vid := uint16(data[5])<<8 | uint16(data[6])
@@ -380,50 +379,19 @@ func ParseBinaryFrame(data []byte) {
 			itfProtocol := data[24]
 			bInterval := data[25]
 			instance := data[26]
-			
-			// 字符串描述符
-			mfgLen := data[27]
-			var manufacturer string
-			if mfgLen > 0 {
-				endIdx := 28 + int(mfgLen)
-				if endIdx > 44 {
-					endIdx = 44
-				}
-				manufacturer = decodeUTF16LE(data[28:endIdx])
-			}
-			
-			prodLen := data[44]
-			var product string
-			if prodLen > 0 {
-				endIdx := 45 + int(prodLen)
-				if endIdx > 61 {
-					endIdx = 61
-				}
-				product = decodeUTF16LE(data[45:endIdx])
-			}
-			
-			serialLen := data[61]
-			var serial string
-			if serialLen > 0 {
-				endIdx := 62 + int(serialLen)
-				if endIdx > 78 {
-					endIdx = 78
-				}
-				serial = decodeUTF16LE(data[62:endIdx])
-			}
-			
+
 			// XOR 校验
 			xorSum := byte(0)
-			for i := 0; i < 78; i++ {
+			for i := 0; i < 27; i++ {
 				xorSum ^= data[i]
 			}
-			if xorSum != data[78] {
+			if xorSum != data[27] {
 				fmt.Printf("[UDP] 0x71 checksum failed: calc=0x%02X recv=0x%02X raw=%s\n",
-					xorSum, data[78], hex.EncodeToString(data[:79]))
-				data = data[79:]
+					xorSum, data[27], hex.EncodeToString(data[:28]))
+				data = data[28:]
 				continue
 			}
-			
+
 			status := "UNMOUNTED"
 			if mounted {
 				status = "MOUNTED  "
@@ -444,6 +412,66 @@ func ParseBinaryFrame(data []byte) {
 				bNumInterfaces, bConfigurationValue, bmAttributes, bMaxPower*2)
 			fmt.Printf("      interface: num=%d class=%02X subclass=%02X protocol=%d interval=%dms instance=%d\n",
 				itfNum, bInterfaceClass, bInterfaceSubclass, itfProtocol, bInterval, instance)
+			data = data[28:]
+		} else {
+			fmt.Printf("[UDP] 0x71 frame too short: %s\n", hex.EncodeToString(data))
+			break
+		}
+
+	case 0x72:
+		// 0x72 字符串描述符帧（Pico USB Host → UART 桥接）
+		// 帧格式：[0x57][0xAB][0x72][dev_addr]
+		//        [mfg_len][mfg_data(16)][prod_len][prod_data(16)][serial_len][serial_data(16)]
+		//        [checksum]（55字节）
+		if len(data) >= 55 {
+			devAddr := data[3]
+
+			// 制造商字符串
+			mfgLen := data[4]
+			var manufacturer string
+			if mfgLen > 0 {
+				endIdx := 5 + int(mfgLen)
+				if endIdx > 21 {
+					endIdx = 21
+				}
+				manufacturer = decodeUTF16LE(data[5:endIdx])
+			}
+
+			// 产品名称字符串
+			prodLen := data[21]
+			var product string
+			if prodLen > 0 {
+				endIdx := 22 + int(prodLen)
+				if endIdx > 38 {
+					endIdx = 38
+				}
+				product = decodeUTF16LE(data[22:endIdx])
+			}
+
+			// 序列号字符串
+			serialLen := data[38]
+			var serial string
+			if serialLen > 0 {
+				endIdx := 39 + int(serialLen)
+				if endIdx > 55 {
+					endIdx = 55
+				}
+				serial = decodeUTF16LE(data[39:endIdx])
+			}
+
+			// XOR 校验
+			xorSum := byte(0)
+			for i := 0; i < 54; i++ {
+				xorSum ^= data[i]
+			}
+			if xorSum != data[54] {
+				fmt.Printf("[UDP] 0x72 checksum failed: calc=0x%02X recv=0x%02X raw=%s\n",
+					xorSum, data[54], hex.EncodeToString(data[:55]))
+				data = data[55:]
+				continue
+			}
+
+			fmt.Printf("[STR] addr=%d\n", devAddr)
 			if manufacturer != "" {
 				fmt.Printf("      manufacturer: %s\n", manufacturer)
 			}
@@ -453,11 +481,12 @@ func ParseBinaryFrame(data []byte) {
 			if serial != "" {
 				fmt.Printf("      serial: %s\n", serial)
 			}
-			data = data[79:]
+			data = data[55:]
 		} else {
-			fmt.Printf("[UDP] 0x71 frame too short: %s\n", hex.EncodeToString(data))
+			fmt.Printf("[UDP] 0x72 frame too short: %s\n", hex.EncodeToString(data))
 			break
 		}
+
 	case 0x77:
 		// 0x77 自定义键盘事件帧（Pico USB Host → UART 桥接）
 		// 帧格式：[0x57][0xAB][0x77][usage][pressed][modifiers][checksum]（7字节）
